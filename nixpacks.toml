@@ -1,0 +1,5 @@
+[phases.setup]
+nixPkgs = ["ffmpeg", "python311", "libsodium"]
+
+[start]
+cmd = "python main.py"

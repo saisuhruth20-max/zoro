@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html lang="en" data-bs-theme="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Discord Bot Dashboard</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" />
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet" />
+  <style>
+    :root {
+      --discord-blurple: #5865F2;
+      --discord-green:   #57F287;
+      --discord-red:     #ED4245;
+      --discord-yellow:  #FEE75C;
+      --card-bg:         #1e2030;
+      --body-bg:         #13151f;
+    }
+    body { background: var(--body-bg); font-family: 'Segoe UI', system-ui, sans-serif; }
+
+    /* Top navbar */
+    .navbar { background: var(--card-bg) !important; border-bottom: 1px solid #2a2d3e; }
+    .navbar-brand { color: var(--discord-blurple) !important; font-weight: 700; font-size: 1.3rem; letter-spacing: -0.5px; }
+
+    /* Cards */
+    .stat-card { background: var(--card-bg); border: 1px solid #2a2d3e; border-radius: 12px; padding: 1.4rem 1.6rem; height: 100%; transition: transform .15s; }
+    .stat-card:hover { transform: translateY(-2px); }
+    .stat-card .icon { font-size: 2rem; margin-bottom: .5rem; }
+    .stat-card .label { font-size: .75rem; text-transform: uppercase; letter-spacing: .08em; color: #8b8fa8; margin-bottom: .25rem; }
+    .stat-card .value { font-size: 2rem; font-weight: 700; line-height: 1; }
+
+    /* Status dot */
+    .status-dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; margin-right: 6px; }
+    .status-dot.online  { background: var(--discord-green); box-shadow: 0 0 6px var(--discord-green); }
+    .status-dot.offline { background: var(--discord-red); }
+
+    /* Section cards */
+    .section-card { background: var(--card-bg); border: 1px solid #2a2d3e; border-radius: 12px; padding: 1.5rem; margin-bottom: 1.5rem; }
+    .section-card h6 { color: #8b8fa8; font-size: .7rem; text-transform: uppercase; letter-spacing: .1em; margin-bottom: 1rem; }
+
+    /* Progress bars for top commands */
+    .cmd-row { margin-bottom: .6rem; }
+    .cmd-name { font-size: .85rem; font-weight: 600; color: #c9cce8; }
+    .cmd-count { font-size: .8rem; color: #8b8fa8; }
+    .progress { height: 6px; background: #2a2d3e; border-radius: 99px; }
+    .progress-bar { background: var(--discord-blurple); border-radius: 99px; }
+
+    /* Recent commands table */
+    .recent-table { font-size: .83rem; }
+    .recent-table td, .recent-table th { border-color: #2a2d3e; padding: .4rem .6rem; }
+    .recent-table thead th { color: #8b8fa8; font-weight: 500; font-size: .7rem; text-transform: uppercase; letter-spacing: .08em; }
+    .badge-cmd { background: #2a2d3e; color: var(--discord-blurple); font-weight: 600; font-size: .78rem; padding: .25em .55em; border-radius: 6px; }
+
+    /* Voice channels */
+    .vc-item { background: #2a2d3e; border-radius: 8px; padding: .6rem 1rem; margin-bottom: .5rem; display: flex; align-items: center; gap: .6rem; font-size: .88rem; }
+    .vc-item .bi { color: var(--discord-blurple); }
+
+    /* Auto-refresh spinner */
+    #refresh-spin { font-size: .75rem; color: #8b8fa8; }
+
+    /* Colour accents per stat */
+    .accent-blurple { color: var(--discord-blurple); }
+    .accent-green   { color: var(--discord-green); }
+    .accent-yellow  { color: var(--discord-yellow); }
+    .accent-red     { color: var(--discord-red); }
+
+    /* Scrollable recent table */
+    .recent-scroll { max-height: 280px; overflow-y: auto; }
+  </style>
+</head>
+<body>
+
+<!-- Navbar -->
+<nav class="navbar navbar-expand-lg px-4">
+  <span class="navbar-brand"><i class="bi bi-robot me-2"></i>Bot Dashboard</span>
+  <span class="ms-auto" id="refresh-spin">
+    <i class="bi bi-arrow-repeat me-1"></i>Refreshing every 5s
+  </span>
+</nav>
+
+<div class="container-fluid py-4 px-4">
+
+  <!-- Status bar -->
+  <div class="d-flex align-items-center mb-4 gap-3">
+    <span id="status-badge" class="badge fs-6 px-3 py-2 text-bg-secondary">
+      <span class="status-dot offline" id="status-dot"></span>
+      <span id="status-text">Checking…</span>
+    </span>
+    <span class="text-secondary fs-6" id="latency-badge"></span>
+    <span class="text-secondary fs-6 ms-auto" id="uptime-badge"></span>
+  </div>
+
+  <!-- Top stats row -->
+  <div class="row g-3 mb-4">
+    <div class="col-6 col-md-3">
+      <div class="stat-card">
+        <div class="icon accent-blurple"><i class="bi bi-server"></i></div>
+        <div class="label">Servers</div>
+        <div class="value accent-blurple" id="guild-count">—</div>
+      </div>
+    </div>
+    <div class="col-6 col-md-3">
+      <div class="stat-card">
+        <div class="icon accent-green"><i class="bi bi-people-fill"></i></div>
+        <div class="label">Total Members</div>
+        <div class="value accent-green" id="member-count">—</div>
+      </div>
+    </div>
+    <div class="col-6 col-md-3">
+      <div class="stat-card">
+        <div class="icon accent-yellow"><i class="bi bi-terminal-fill"></i></div>
+        <div class="label">Commands Run</div>
+        <div class="value accent-yellow" id="cmd-count">—</div>
+      </div>
+    </div>
+    <div class="col-6 col-md-3">
+      <div class="stat-card">
+        <div class="icon" style="color:#eb459e"><i class="bi bi-mic-fill"></i></div>
+        <div class="label">Voice Channels</div>
+        <div class="value" style="color:#eb459e" id="vc-count">—</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Main content row -->
+  <div class="row g-4">
+
+    <!-- Left column: top commands + voice -->
+    <div class="col-lg-5">
+
+      <!-- Top commands -->
+      <div class="section-card">
+        <h6><i class="bi bi-bar-chart-fill me-2"></i>Top Commands</h6>
+        <div id="top-commands">
+          <span class="text-secondary small">No commands recorded yet.</span>
+        </div>
+      </div>
+
+      <!-- Active voice channels -->
+      <div class="section-card">
+        <h6><i class="bi bi-volume-up-fill me-2"></i>Active Voice Channels</h6>
+        <div id="voice-channels">
+          <span class="text-secondary small">Not connected to any voice channel.</span>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Right column: recent activity -->
+    <div class="col-lg-7">
+      <div class="section-card" style="height:100%">
+        <h6><i class="bi bi-activity me-2"></i>Recent Activity</h6>
+        <div class="recent-scroll">
+          <table class="table table-borderless recent-table mb-0">
+            <thead>
+              <tr>
+                <th>Command</th>
+                <th>User</th>
+                <th>Server</th>
+                <th>Time</th>
+              </tr>
+            </thead>
+            <tbody id="recent-body">
+              <tr>
+                <td colspan="4" class="text-secondary">No activity yet.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /row -->
+
+  <p class="text-secondary text-center mt-4" style="font-size:.75rem;">
+    Discord AI Bot &mdash; Dashboard auto-refreshes every 5 seconds.
+  </p>
+
+</div><!-- /container -->
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+  async function fetchStats() {
+    try {
+      const res = await fetch('/api/stats');
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      return await res.json();
+    } catch (e) {
+      return null;
+    }
+  }
+
+  function renderTopCommands(commands) {
+    const container = document.getElementById('top-commands');
+    if (!commands || commands.length === 0) {
+      container.innerHTML = '<span class="text-secondary small">No commands recorded yet.</span>';
+      return;
+    }
+    const max = commands[0][1];
+    container.innerHTML = commands.map(([name, count]) => `
+      <div class="cmd-row">
+        <div class="d-flex justify-content-between mb-1">
+          <span class="cmd-name">!${name}</span>
+          <span class="cmd-count">${count} use${count !== 1 ? 's' : ''}</span>
+        </div>
+        <div class="progress">
+          <div class="progress-bar" style="width:${Math.round((count/max)*100)}%"></div>
+        </div>
+      </div>
+    `).join('');
+  }
+
+  function renderVoiceChannels(channels) {
+    const container = document.getElementById('voice-channels');
+    if (!channels || channels.length === 0) {
+      container.innerHTML = '<span class="text-secondary small">Not connected to any voice channel.</span>';
+      return;
+    }
+    container.innerHTML = channels.map(vc => `
+      <div class="vc-item">
+        <i class="bi bi-volume-up-fill"></i>
+        <div>
+          <div style="font-weight:600">${escHtml(vc.channel)}</div>
+          <div style="font-size:.78rem;color:#8b8fa8">${escHtml(vc.guild)}</div>
+        </div>
+      </div>
+    `).join('');
+  }
+
+  function renderRecentActivity(recent) {
+    const tbody = document.getElementById('recent-body');
+    if (!recent || recent.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="4" class="text-secondary">No activity yet.</td></tr>';
+      return;
+    }
+    tbody.innerHTML = recent.map(r => `
+      <tr>
+        <td><span class="badge-cmd">!${escHtml(r.command)}</span></td>
+        <td>${escHtml(r.user)}</td>
+        <td>${escHtml(r.guild)}</td>
+        <td style="color:#8b8fa8">${escHtml(r.timestamp)}</td>
+      </tr>
+    `).join('');
+  }
+
+  function escHtml(str) {
+    return String(str)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;');
+  }
+
+  async function update() {
+    const data = await fetchStats();
+
+    // Status badge
+    const dot  = document.getElementById('status-dot');
+    const text = document.getElementById('status-text');
+    const badge = document.getElementById('status-badge');
+    const latency = document.getElementById('latency-badge');
+    const uptime  = document.getElementById('uptime-badge');
+
+    if (data && data.online) {
+      dot.className  = 'status-dot online';
+      text.textContent = 'Online';
+      badge.className = 'badge fs-6 px-3 py-2 text-bg-success';
+      latency.textContent = `🏓 ${data.latency_ms}ms`;
+      uptime.textContent  = `⏱️ Uptime: ${data.uptime}`;
+    } else {
+      dot.className  = 'status-dot offline';
+      text.textContent = 'Offline';
+      badge.className = 'badge fs-6 px-3 py-2 text-bg-danger';
+      latency.textContent = '';
+      uptime.textContent  = '';
+    }
+
+    if (data) {
+      document.getElementById('guild-count').textContent  = data.guild_count  ?? '—';
+      document.getElementById('member-count').textContent = data.member_count ?? '—';
+      document.getElementById('cmd-count').textContent    = data.total_commands ?? '—';
+      document.getElementById('vc-count').textContent     = (data.voice_channels || []).length;
+      renderTopCommands(data.top_commands);
+      renderVoiceChannels(data.voice_channels);
+      renderRecentActivity(data.recent_commands);
+    }
+  }
+
+  // Run immediately then every 5 seconds
+  update();
+  setInterval(update, 5000);
+</script>
+</body>
+</html>
